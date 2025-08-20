@@ -1,9 +1,10 @@
 # Classifying-Biophysical-Subpopulations-of-ISGS
 Code used to perform ISG Subpopulation Analysis
 
-<img src="BlenderRenderings/9917_2_Clusters_TAK.png" alt="ISG" width="400">
-<img src="BlenderRenderings/9917_2_Whole_TAK.png" alt="ISG" width="400">
-
+<p align = "center">
+  <img src="BlenderRenderings/9917_2_Clusters_TAK.png" alt="ISG" width="400">
+  <img src="BlenderRenderings/9917_2_Whole_TAK.png" alt="ISG" width="400">
+</p>p
 Contact email: kchang42@usc.edu
 
 # Code Breakdown
