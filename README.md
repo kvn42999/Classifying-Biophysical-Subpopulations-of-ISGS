@@ -2,7 +2,7 @@
 Code used to perform ISG Subpopulation Analysis
 
 <img src="BlenderRenderings/9917_2_Clusters_TAK.png" alt="ISG" width="400">
-
+<img src="BlenderRenderings/9917_2_Whole_TAK.png" alt="ISG" width="400">
 
 Contact email: kchang42@usc.edu
 
