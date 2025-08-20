@@ -6,5 +6,5 @@ Contact email: kchang42@usc.edu
 # Code Breakdown
 Python functions used to perform data parameterization
 
-R function used to perform clustering analysis 
+R functions used to perform clustering analysis 
 
