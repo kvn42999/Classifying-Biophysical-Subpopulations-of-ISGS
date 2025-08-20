@@ -12,7 +12,7 @@ Below, a cell imaged using SXT is shown on the left, with the nucleus, mitochond
 Contact email: kchang42@usc.edu
 
 # Code Breakdown
-Python functions used to perform data parameterization
+Python functions used to perform data parameterization of ISGs from SXT tomograms.
 
-R functions used to perform clustering analysis 
+R functions used to perform clustering analysis, primarily using the R package flexclust (https://cran.r-project.org/web/packages/flexclust/index.html)
 
