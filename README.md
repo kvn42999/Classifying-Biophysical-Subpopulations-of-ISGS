@@ -1,7 +1,7 @@
 # Classifying-Biophysical-Subpopulations-of-ISGS
 Code used to perform ISG Subpopulation Analysis
 
-Below, a cell imaged using SXT is shown on the left, with the nucleus, mitochondria, plasma membrane, and ISGs shown. To the right, the different classes of ISGs are depicted. 
+Below, a cell imaged using SXT is shown on the left, with the nucleus, mitochondria, plasma membrane, and ISGs shown. To the right, the different classified subpopulations of ISGs are depicted. 
 
 <p align = "center">
   <img src="BlenderRenderings/9917_2_Whole_TAK.png" alt="ISG" width="400">
