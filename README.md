@@ -1,7 +1,8 @@
 # Classifying-Biophysical-Subpopulations-of-ISGS
 Code used to perform ISG Subpopulation Analysis
 
-![ISG Subpopulations of INS-1E Cell stimulated with TAK](BlenderRenderings/9917_2_Clusters_TAK.png)
+<img src="BlenderRenderings/9917_2_Clusters_TAK.png" alt="ISG" width="600">
+
 
 Contact email: kchang42@usc.edu
 
