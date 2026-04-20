@@ -1,0 +1,969 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-10-20"
+---
+
+```{r setup, include=FALSE}
+# Load libraries
+library(dplyr)
+library(tidyr)
+library(tibble)
+
+library(flexclust)
+library(parallel)
+library(ggplot2)
+library(envalysis)
+library(paletteer)
+library(ggtext)
+
+library(corrplot)
+library(scales)
+
+
+cl <- makeCluster(2, type = "PSOCK")
+clusterCall(cl, function() require("flexclust"))
+
+
+library(umap)
+library(uwot)
+
+#for pca analysis
+library(factoextra)
+
+#for permanova analysis
+library(vegan)
+library(pairwiseAdonis)
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+Filter_Unnorm_Ves <- read.csv("D:/Downloads/Drug Stimulated INS1E Cells/CSV_files_revisions/Unnorm/Filtered_All_Cond_Unorm_vesicles_revised.csv")
+Filter_Unnorm_Ves
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+Filter_Norm_Ves <- Filter_Unnorm_Ves %>% 
+  filter(`Geometric.Diameter..nm.` != 0) %>% #Remove weird 0 sized diameters 
+  mutate(across(c(LAC.Value, LAC.Std.Dev, Geometric.Diameter..nm., Min.Distance.to.PM.EDT, Mito.Dist.EDT), ~ scale(.)[, 1])) %>%  #Scale approperiate columns
+  select(-c(Cell, Condition)) #Remove categories for analysis 
+Filter_Norm_Ves
+```
+
+```{r}
+#Stability Analysis 
+Fin_All_Cond_bfc <- bootFlexclust(Filter_Norm_Ves, k = 2:9, nboot = 100, FUN = kcca, multicore = cl)
+plot(Fin_All_Cond_bfc)
+```
+
+```{r}
+fin_All_Cond_clust<- kcca(Filter_Norm_Ves, k = 5, family = kccaFamily("kmeans"))
+image(fin_All_Cond_clust)
+barchart(fin_All_Cond_clust, shae = TRUE)
+```
+
+```{r}
+Filter_Norm_Ves_log <- Filter_Unnorm_Ves %>% 
+  mutate(across(c(Mito.Dist.EDT, Min.Distance.to.PM.EDT), ~ log10(. + 0.01))) %>%  #log transform distance metrics 
+  filter(`Geometric.Diameter..nm.` != 0) %>%  #Remove weird 0 sized diameters 
+  mutate(across(c(LAC.Value, LAC.Std.Dev, Geometric.Diameter..nm., Min.Distance.to.PM.EDT, Mito.Dist.EDT), ~ scale(.)[, 1])) %>%  #Scale approperiate columns
+  select(-c(Cell, Condition)) #Remove categories for analysis 
+Filter_Norm_Ves_log
+
+```
+
+```{r}
+#Stability Analysis 
+Fin_All_Cond_log_bfc <- bootFlexclust(Filter_Norm_Ves_log, k = 2:9, nboot = 100, FUN = kcca, multicore = cl)
+plot(Fin_All_Cond_log_bfc)
+```
+
+```{r}
+#transforming result for suitable visualization 
+
+rand_indices_fin <- Fin_All_Cond_log_bfc@rand
+rand_df_fin <- data.frame(Cluster = rand_indices_fin)
+rand_df_fin_long <- rand_df_fin %>% pivot_longer(cols = everything(), names_to = "Cluster", values_to = "RandIndex")
+rand_df_fin_long
+
+#ggplot
+
+Clust_Stab_fin <- ggplot(rand_df_fin_long, aes(x = Cluster, y = RandIndex)) +
+  geom_boxplot(aes(fill = Cluster)) +
+  
+  scale_x_discrete(labels = as.character(2:9)) +
+  guides(fill = "none") +
+  labs(x = "Number of Clusters", y = "Rand Index"
+       #title = "Global Stability Analysis", subtitle = "K Medians", 
+       ) +
+  theme_publish() +
+  theme(
+    axis.title.x = element_text(size = rel(1.8), hjust = 0.5),
+    axis.title.y = element_text(size = rel(1.8)),
+    axis.text.x = element_text(size = rel(1.5)),
+    axis.text.y = element_text(size = rel(1.5)),
+  )
+Clust_Stab_fin
+
+#ggsave("Clust_Stab_fin_rev.png", plot = Clust_Stab_fin, width = 7, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+fin_All_Cond_clust_log<- kcca(Filter_Norm_Ves_log, k = 5, family = kccaFamily("kmeans"))
+image(fin_All_Cond_clust_log)
+barchart(fin_All_Cond_clust_log, shae = TRUE)
+```
+
+```{r}
+#Stability Analysis w/ k-medians
+Fin_All_Cond_log_med_bfc <- bootFlexclust(Filter_Norm_Ves_log, k = 2:9, nboot = 100, FUN = kcca, multicore = cl, family = kccaFamily("kmedians"))
+plot(Fin_All_Cond_log_med_bfc)
+```
+
+```{r}
+fin_All_Cond_clust_log_med<- kcca(Filter_Norm_Ves_log, k = 5, family = kccaFamily("kmedians"))
+image(fin_All_Cond_clust_log_med)
+barchart(fin_All_Cond_clust_log_med, shae = TRUE)
+```
+
+```{r}
+#Add in clusters to dataset
+
+#Filter_Norm_Ves_log_clust <- Filter_Norm_Ves_log %>% 
+#  mutate(clusters = clusters(fin_All_Cond_clust_log_med))
+#Filter_Norm_Ves_log_clust
+#write.csv(Filter_Norm_Ves_log_clust, "FinClust_02.csv", row.names = FALSE)
+
+#Test with PC's
+#Filter_Norm_Ves_log_clust <- Filter_Norm_Ves_log %>% 
+#  mutate(clusters = clusters(pca_df_4_clust))
+#Filter_Norm_Ves_log_clust
+##############################
+
+Filter_Norm_Ves_log_clust <- read.csv("FinClust_02.csv")
+
+#Relabel things to adjust be 1 > 5 by order of LAC (lowest to highest LAC)
+recluster_id <- c("2" = "5",
+                  "5" = "4",
+                  "4" = "3",
+                  "1" = "2",
+                  "3" = "1"
+                  )
+#ID changing 
+Filter_Norm_Ves_log_clust_id <- Filter_Norm_Ves_log_clust %>%
+  mutate(clusters = recode(clusters, !!!recluster_id))
+Filter_Norm_Ves_log_clust_id
+
+###############################
+
+#long format
+Filter_Norm_Ves_log_clust_long <- Filter_Norm_Ves_log_clust %>%
+  group_by(clusters) %>%
+  summarise(across(everything(), median)) %>%
+  ungroup() %>%
+  pivot_longer(
+    cols = -(c(clusters)),
+    names_to = "Parameter",
+    values_to = "Z_Score"
+  ) %>%
+  mutate(clusters = as.character(clusters)) #%>%
+  #mutate(clusters = recode(clusters, !!!recluster_id))
+
+
+
+Filter_Norm_Ves_log_clust_long
+```
+
+```{r}
+#Presets
+
+#Parameter labels 
+cust_param_labels <-  c(
+    "Mito.Dist.EDT" = "Distance from Mitochondria",
+    "Min.Distance.to.PM.EDT" = "Distance from PM",
+    "LAC.Value" = "LAC Mean",
+    "LAC.Std.Dev" = "LAC Std. Dev.",
+    "Geometric.Diameter..nm." = "Granule Diameter"
+  )
+
+#what columns to show/order of columns
+show_col <- rev(c("LAC.Value", "Geometric.Diameter..nm.", "LAC.Std.Dev", "Min.Distance.to.PM.EDT", "Mito.Dist.EDT"))
+
+facet_title_labels <- c(
+  "1" = "Subpopulation 1 \n (24%)",
+  "2" = "Subpopulation 2 \n (20%)",
+  "3" = "Subpopulation 3 \n (20%)",
+  "4" = "Subpopulation 4 \n (22%)",
+  "5" = "Subpopulation 5 \n (14%)"
+)
+#--------------------------------------------------------------------------------------
+
+#ggplot
+#only show certain columns(filter), then use have them in correct order(factor)
+Profile_bar <- ggplot(Filter_Norm_Ves_log_clust_long %>% filter(Parameter %in% show_col), 
+       aes(x = factor(Parameter, show_col), 
+           y = Z_Score, 
+           fill = clusters)) +
+  
+  #Reorient Z-Score. subtract -1.5, then shift y axis by the same amout
+  geom_col(aes(y = Z_Score - (-1.5) )) +
+  scale_y_continuous(labels = function(x) x + (-1.5),
+                     breaks = c(0,0.5,1,1.5,2,2.5,3,3.5),
+                     limits = c(0, NA),        # Start from 0, auto upper limit
+                     expand = c(0, 0)) +
+
+  #Flip axis and facet. Use  correct x axis labels
+  coord_flip(clip = "off") +
+  facet_wrap(~clusters, nrow = 2, labeller = as_labeller(facet_title_labels), axes = "all_x") +  #Use custom facet labels
+  scale_x_discrete(labels = cust_param_labels, limits = show_col) +  #show only certain rows and use custom labels
+
+  #graph design
+  guides(fill = FALSE) +
+  labs(y = "Z-Score", x = "") + 
+  theme_publish() +
+  #theme(
+  #    strip.background = element_rect(fill = "bisque"),
+  #    strip.text.x = element_markdown(size = rel(1.65), hjust = 0.5),
+  #    axis.title.x = element_text(size = rel(2), hjust = 0.5),
+  #    axis.text.x = element_text(size = rel(1.5)),
+  #    axis.text.y = element_text(size = rel(1.5)),
+  #    #plot.margin = margin(5.5, 11.0, 5.5, 5.5)
+  #) 
+  theme(
+      #strip.background = element_rect(fill = "bisque"),
+      strip.text.x = element_text(size = rel(2.3), hjust = 0.5),
+      panel.spacing = unit(2.5, "lines"),
+      axis.title.x = element_text(size = rel(2.2), hjust = 0.5),
+      axis.text.x = element_text(size = rel(1.8)),
+      axis.text.y = element_text(size = rel(2.2)),
+      plot.margin  = margin(t = 5.5, r = 30, b = 5.5, l = 5.5)
+      #text = element_text(family = "Arial")
+      ) 
+
+Profile_bar
+```
+```{r}
+#ggsave("Fin_ProfilePlot_2row.png", plot = Profile_bar, 
+ggsave("PCtest_Fin_ProfilePlot_2row_tmp.png", Profile_bar, 
+       width = 16, height = 9, 
+       dpi = 1500, bg = "white", 
+       )
+
+```
+
+
+```{r}
+#UMAP Creation
+#dataset
+Filter_Norm_Ves_log_clust_id
+
+#umap fitting
+#umap_resultParams <- umap(Filter_Norm_Ves_log_clust_id[, -8], n_neighbors = 100, min_dist = 0.2, metric = "euclidean", n_components = 2)
+umap_resultParams <- umap(Filter_Norm_Ves_log_clust_id[, -8], n_neighbors = 10, min_dist = 0.9, metric = "euclidean", n_components = 2)
+#umap_resultParams <- umap(Filter_Norm_Ves_log_clust_id[, -8], n_neighbors = 5, min_dist = 0.5, metric = "euclidean", n_components = 2)
+
+
+#Create dataframe for UMAP
+umap_df <- as.data.frame(umap_resultParams)
+umap_df
+colnames(umap_df) <- c("UMAP1", "UMAP2")
+umap_df$Cluster <- as.character(Filter_Norm_Ves_log_clust$clusters) # Add cluster labels back
+umap_df
+
+#Add in condition labels 
+Cond_Ves <- Filter_Unnorm_Ves %>% 
+  filter(`Geometric.Diameter..nm.` != 0) #Remove weird 0 sized diameters 
+umap_df$Condition <- as.character(Cond_Ves$Condition)
+
+umap_df
+```
+
+```{r}
+Facted_UMAP_Parameter_df <- cbind(umap_df, Filter_Norm_Ves_log_clust_id)
+Facted_UMAP_Parameter_df
+
+UMAP_Plot <- ggplot(Facted_UMAP_Parameter_df, aes(x = UMAP1, y = UMAP2, 
+                                                  color = clusters,
+                                                  )) +
+  geom_point(alpha = 0.6, size = 1, 
+             #color = "#f1b032"
+             ) +
+  
+  labs(color = "Subpopulation") + 
+  theme_classic() +
+  guides(color = guide_legend(
+    override.aes = list(size = 9),
+    keywidth = unit(1.5 , "cm"),
+    default.unit= "cm",
+    nrow = 1,
+    title.position = "top",           # title above the keys
+    )) + 
+  theme(
+    axis.title.x = element_text(size = rel(3.8), hjust = 0.5),
+    axis.title.y = element_text(size = rel(3.8)),
+    axis.text.x = element_text(size = rel(3.5)),
+    axis.text.y = element_text(size = rel(3.5)),
+    
+    
+    legend.text = element_text(size = rel(3)),
+    legend.title = element_text(size = 43),
+    legend.key.size = unit(1.5, "cm"),
+    
+     legend.position = "bottom",
+    #legend.position = c(0.15, 0.15),
+    legend.justification = c(0, 0),
+    legend.spacing.x = unit(1.5, "cm")
+
+  
+) 
+
+UMAP_Plot
+
+#ggsave("UMAP_Fin_weight_rev_bw.png", plot = UMAP_Plot,  dpi = 500, width = 13, height = 11)
+
+```
+
+```{r}
+# PCA Creation
+# dataset
+Filter_Norm_Ves_log_clust_id
+
+# Perform PCA
+pca_result <- prcomp(Filter_Norm_Ves_log_clust_id[, -8], center = TRUE, scale. = TRUE)
+
+# Create dataframe for PCA results (first 2 principal components)
+pca_df <- as.data.frame(pca_result$x[, 1:2])
+colnames(pca_df) <- c("PC1", "PC2")
+
+# Add cluster labels back
+pca_df$Cluster <- as.character(Filter_Norm_Ves_log_clust$clusters)
+
+# Add condition labels (removing weird 0-sized diameters)
+Cond_Ves <- Filter_Unnorm_Ves %>%
+  filter(`Geometric.Diameter..nm.` != 0)
+
+pca_df$Condition <- as.character(Cond_Ves$Condition)
+
+# Inspect the PCA dataframe
+head(pca_df)
+
+# (Optional) Visualize PCA
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster, shape = Condition)) +
+  geom_point(alpha = 0.8, size = 3) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "PCA of Filter_Norm_Ves_log_clust_id",
+    x = "Principal Component 1",
+    y = "Principal Component 2"
+  )
+
+```
+```{r}
+summary(pca_result)
+
+
+fviz_eig(pca_result, addlabels = TRUE, ylim = c(0, 100))
+
+#scree plot?
+#library(car)
+#vif(lm(as.matrix(Filter_Norm_Ves_log_clust_id[, -8]) ~ 1))
+
+```
+```{r}
+eig <- pca_result$sdev^2
+pct <- eig / sum(eig) * 100
+df_scree <- data.frame(PC = seq_along(pct), Variance = pct)
+
+Scree_plot <- ggplot(df_scree, aes(PC, Variance)) +
+  geom_point() + geom_line() +
+  scale_x_continuous(breaks = df_scree$PC) +
+  labs(
+    #title = "Scree Plot", 
+    x = "Principal Component", y = "Variance Explained (%)") +
+  theme_publish() +
+  theme(
+    #plot.title = element_text(size = rel(2.2)),
+    axis.title.x = element_text(size = rel(2.2), hjust = 0.5),
+    axis.title.y = element_text(size = rel(2)),
+    axis.text.x = element_text(size = rel(2)),
+    axis.text.y = element_text(size = rel(2.5)),
+  ) 
+Scree_plot
+ggsave("Scree_plot_PCA.png", plot = Scree_plot, width = 8, dpi = 500, height = 6, bg = "white")
+```
+```{r}
+# Variable loadings (correlations with PCs)
+pca_result$rotation
+```
+
+```{r}
+
+# Visualize variable contributions to PCs
+Loadings_pca <- fviz_pca_var(pca_result, col.var = "contrib") +
+  #scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 15) +
+  
+  #scale_color_viridis_c(option = "cividis_r") + 
+  labs(title = "", color = "Relative\nContribution", fill = "Contribution", x = "PC1 (30%)", y = "PC2 (18%)") +  
+  theme_publish() +
+  theme(
+    #legend.position = "right",
+    legend.title = element_text(size = rel(1.2)),   # larger title text
+    legend.text  = element_text(size = rel(1.2)),     # larger tick labels
+    legend.key.height = unit(0.5, "cm"),            # taller colorbar
+    legend.key.width  = unit(0.8, "cm"),             # wider colorbar
+    #plot.title = element_text(size = rel(2.2)),
+    
+    axis.title.x = element_text(size = rel(1.8), hjust = 0.5),
+    axis.title.y = element_text(size = rel(1.6)),
+    axis.text.x = element_text(size = rel(1.5)),
+    axis.text.y = element_text(size = rel(1.3)),
+  ) +
+  guides(
+    title.position = "top"
+  )
+Loadings_pca
+ggsave("Loadings_PCA.png", plot = Loadings_pca, width = 8, dpi = 500, height = 6, bg = "white")
+```
+```{r}
+cor(Filter_Unnorm_Ves$LAC.Value, Filter_Unnorm_Ves$Mito.Dist.EDT)
+```
+
+```{r}
+PCA_Plot <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point(alpha = 0.5, size = 0.8, 
+             #color = "#f1b032"
+             ) +
+  
+  labs(
+    x = "PC1 (30%)",
+    y = "PC2 (18%)",
+    color = "Subpopulation"
+    ) + 
+  theme_classic() +
+  guides(color = guide_legend(
+    override.aes = list(size = 9),
+    keywidth = unit(1.5 , "cm"),
+    default.unit= "cm",
+    nrow = 1,
+    title.position = "top",           # title above the keys
+    )) + 
+  theme(
+    axis.title.x = element_text(size = rel(3.8), hjust = 0.5),
+    axis.title.y = element_text(size = rel(3.8)),
+    axis.text.x = element_text(size = rel(3.5)),
+    axis.text.y = element_text(size = rel(3.5)),
+    
+    
+    legend.text = element_text(size = rel(3)),
+    legend.title = element_text(size = 43),
+    legend.key.size = unit(1.5, "cm"),
+    
+    legend.position = "bottom",
+    #legend.position = c(0.15, 0.15),
+    legend.justification = c(0, 0),
+    legend.spacing.x = unit(1.5, "cm")
+    ) +
+   coord_cartesian(xlim = c(-10, 5))
+
+PCA_Plot
+
+#ggsave("PCA_Fin_weight_rev.png", plot = PCA_Plot,  dpi = 500, width = 13, height = 11)
+#ggsave("FINAL_test_PCA_Fin_weight_rev.png", plot = PCA_Plot,  dpi = 500, width = 13, height = 11)
+
+```
+```{r}
+# Create dataframe for PCA results (first 2 principal components)
+pca_df_4 <- as.data.frame(pca_result$x[, 1:5])
+colnames(pca_df) <- c("PC1", "PC2", "PC3", "PC4")
+pca_df_4
+
+#Stability Analysis 
+#pca_df_4_bfc <- bootFlexclust(pca_df_4, k = 2:9, nboot = 100, FUN = kcca, multicore = cl)
+#plot(pca_df_4_bfc)
+
+pca_df_4_clust_tmp<- kcca(pca_df_4, k = 5, family = kccaFamily("kmedians"))
+image(pca_df_4_clust_tmp)
+barchart(pca_df_4_clust_tmp, shae = TRUE)
+#km <- kmeans(cluster_data, centers = 3)
+```
+
+```{r}
+# Create dataframe for PCA results (first 2 principal components)
+pca_df_4 <- as.data.frame(pca_result$x[, 1:5])
+colnames(pca_df) <- c("PC1", "PC2", "PC3", "PC4")
+pca_df_4
+
+#Stability Analysis 
+#pca_df_4_bfc <- bootFlexclust(pca_df_4, k = 2:9, nboot = 100, FUN = kcca, multicore = cl)
+#plot(pca_df_4_bfc)
+
+pca_df_4_clust_tmp<- kcca(pca_df_4, k = 5, family = kccaFamily("kmedians"))
+image(pca_df_4_clust_tmp)
+barchart(pca_df_4_clust_tmp, shae = TRUE)
+#km <- kmeans(cluster_data, centers = 3)
+
+```
+```{r}
+write.csv(clusters(pca_df_4_clust_tmp), "FinClust_03.csv", row.names = FALSE)
+
+```
+
+
+```{r}
+#operations to construct the proper dataframe to make the stacked cluster. 1) list of conditions after the diameter = 0 filter, 2) Add in list of conditions, 3) Count number of vesicles per conditions, 4) construct stacked dataframe and compute percentages of condition per clusters, 5) adjust for # of vesicles per condition
+
+#Get conditions when filtered
+Cond_array <- Filter_Unnorm_Ves %>% 
+  filter(`Geometric.Diameter..nm.` != 0) %>%
+  select(Condition) #Remove categories for analysis 
+
+#Dataframe normalized, with clusters and conditions 
+Filter_Norm_Ves_log_clust_Cond <- Filter_Norm_Ves_log_clust %>%
+  mutate(Condition = Cond_array$Condition) %>%
+  mutate(clusters = as.character(clusters)) %>%
+  mutate(clusters = recode(clusters, !!!recluster_id))  #reorder accoring to LAC
+
+Filter_Norm_Ves_log_clust_Cond
+
+#Counts of each condition
+Cond_counts <- Cond_array %>%
+  count(Condition)
+Cond_counts
+
+#Formatting for stacked bar chart
+Fin_Stacked_Condition_Cluster_graph <-  Filter_Norm_Ves_log_clust_Cond   %>% 
+  select(-c(LAC.Value, LAC.Std.Dev, LAC.Skew, LAC.Kurtosis, Geometric.Diameter..nm., Min.Distance.to.PM.EDT, Mito.Dist.EDT))  %>% 
+  #percentage calculation
+  count(Condition, clusters) %>%
+  group_by(clusters) %>%
+  mutate(percentage = n / sum(n) * 100) 
+Fin_Stacked_Condition_Cluster_graph
+```
+```{r}
+#Order_Fin_Stacked_Condition_Cluster_graph
+
+
+#Subpopulation Shifts
+Order_Fin_Stacked_Condition_Cluster_graph <- Fin_Stacked_Condition_Cluster_graph
+#Custom "ordering" modifications
+Order_Fin_Stacked_Condition_Cluster_graph$Condition <- factor(
+  Order_Fin_Stacked_Condition_Cluster_graph$Condition,
+  levels = (c("No Stim", "Glucose", "GLM", "GKA", "TAK", "GIP", "EXT"))
+  )
+facet_condition_labels <- c(
+  "No Stim" = "No Stim",
+  "Glucose" = "Glucose",
+  "GLM" = "GLM",
+  "GKA" = "GKA",
+  "TAK" = "TAK",
+  "GIP" = "GIP",
+  "EXT" = "Ex-4"  # <-- This changes just this one
+)
+
+#ggplot
+Subpopulation_Shifts <- ggplot(Order_Fin_Stacked_Condition_Cluster_graph, aes(x = clusters, y = percentage, fill = clusters)) +
+  geom_bar(stat= "identity") +
+  facet_wrap(~Condition, nrow = 1, labeller = as_labeller(facet_condition_labels))  +
+  scale_y_continuous(expand = c(0, 0)) +
+
+  #graph design
+  labs(x = "Clusters", y = "Percentage")+
+  theme_publish() +
+  guides(fill = FALSE) +
+  theme(
+    #strip.background = element_rect(fill = "bisque"),
+    strip.text.x = element_text(size = rel(1.65), hjust = 0.5),
+    axis.title.x = element_text(size = rel(1.5), hjust = 0.5),
+    axis.title.y = element_text(size = rel(1.5)),
+    axis.text.x = element_text(size = rel(1.5)),
+    axis.text.y = element_text(size = rel(1.5)),
+    #plot.margin = margin(5.5, 11.0, 5.5, 5.5)
+  ) 
+
+##################################################
+
+Order_Fin_adjust_Stacked_Condition_Cluster <- Fin_adjust_Stacked_Condition_Cluster
+#Custom "ordering" modifications
+Order_Fin_adjust_Stacked_Condition_Cluster$Condition <- factor(
+  Order_Fin_adjust_Stacked_Condition_Cluster$Condition,
+  levels = (c("No Stim", "Glucose", "GLM", "GKA", "TAK", "GIP", "EXT"))
+  )
+
+Subpopulation_Shifts_adjust <- Subpopulation_Shifts %+% Order_Fin_adjust_Stacked_Condition_Cluster 
+
+##################################################
+#Clusters in each condition add up to 100%
+
+Adjust_Cond100_subpop <- Filter_Norm_Ves_log_clust_Cond %>%
+  select(c(clusters, Condition)) %>%
+  group_by(Condition) %>%  #keep everything grouped by condition
+  count(clusters) %>%
+  mutate(percentage = n / sum(n) * 100)
+Adjust_Cond100_subpop
+
+#Custom "ordering" modifications
+Adjust_Cond100_subpop$Condition <- factor(
+  Adjust_Cond100_subpop$Condition,
+  levels = (c("No Stim", "Glucose", "GLM", "GKA", "TAK", "GIP", "EXT"))
+  )
+
+
+Subpopulation_Shifts_adjust_100 <- Subpopulation_Shifts %+% Adjust_Cond100_subpop + coord_cartesian(ylim = c(0, 55))
+
+##################################################
+
+nrow1_Subpopshift_adjust100 <- Subpopulation_Shifts_adjust_100 %+% facet_wrap(~Condition, nrow = 1, labeller = as_labeller(facet_condition_labels)) + labs(x = "Subpopulations") + theme(panel.spacing = unit(1.5, "lines"))
+nrow1_Subpopshift_adjust100
+
+#ggsave("nrow1_Subpopulation_Shifts_adjust_100_rev.png", plot = nrow1_Subpopshift_adjust100, width = 15, height = 4, dpi = 1500, bg = "white")
+```
+```{r}
+nrow1_Subpopshift_adjust100_black <- nrow1_Subpopshift_adjust100 +
+    #facet_wrap(~Condition, nrow = 1, strip.position = "top", labeller = as_labeller(facet_condition_labels))  +
+
+  theme(
+    text = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    plot.title = element_text(color = "white"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+     axis.line = element_line(color = "white", linewidth = 0.7),
+    axis.ticks = element_line(color = "white"),
+      strip.placement = "outside"
+
+  )
+nrow1_Subpopshift_adjust100_black
+
+#ggsave("nrow1_Subpopshift_adjust100_black.png", plot = nrow1_Subpopshift_adjust100_black, width = 15, height = 4, dpi = 1500, bg = "black")
+
+```
+
+```{r}
+#hist(Filter_Prim_Unnorm_Ves$LAC.Value, breaks = 30)
+
+INS1E_LAC_hist <- ggplot(Filter_Unnorm_Ves, aes(x = LAC.Value)) +
+  geom_histogram(fill = "blue") +
+  
+  labs(x = expression("LAC Mean ("*μ*m^{-1}*")")
+       , y = "Frequency", title = "LAC Mean of INS-1E ISGs") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  scale_x_continuous(breaks = pretty_breaks(n = 6)) +  # ~6 ticks on x-axis
+  
+  theme_publish() +
+  theme(
+    plot.title = element_text(size = rel(2.2)),
+    axis.title.x = element_text(size = rel(2.2), hjust = 0.5),
+    axis.title.y = element_text(size = rel(2)),
+    axis.text.x = element_text(size = rel(2)),
+    axis.text.y = element_text(size = rel(2.5)),
+  ) 
+INS1E_LAC_hist
+
+tmp_Filter_Unnorm_Ves <- Filter_Unnorm_Ves %>%
+  filter(!(Geometric.Diameter..nm. > 500 | Geometric.Diameter..nm. == 0))
+tmp_Filter_Unnorm_Ves
+INS1E_Diam_hist <- INS1E_LAC_hist %+% 
+  tmp_Filter_Unnorm_Ves +
+  aes(x = Geometric.Diameter..nm.) + labs(x = "Granule Diameter (nm)", title = "Granule Size of INS-1E ISGs")  
+INS1E_Diam_hist
+
+INS1E_PMdist_hist <- INS1E_LAC_hist %+% aes(x = Min.Distance.to.PM.EDT) + labs(x = "Normalized EDT Distance to PM", title = "Distance of INS-1E ISGs from PM") + theme( plot.margin = unit(c(1.5, 1, 1, 1), "cm"))
+INS1E_PMdist_hist
+
+#ggsave("INS1E_PMDist_rev.png", plot = INS1E_PMdist_hist, width = 9, height = 7, dpi = 500, bg = "white")
+
+```
+```{r}
+Unnorm_Ves_stats <- read.csv("D:/Downloads/Drug Stimulated INS1E Cells/CSV_files_revisions/Unnorm/All_Cond_Unorm_vesicles_revised.csv")
+Unnorm_Ves_stats_tmp <- Unnorm_Ves_stats %>%
+  filter(!(Geometric.Diameter..nm. > 500 | Geometric.Diameter..nm. == 0)) %>%
+  select(-c("Centroid.X", "Centroid.Y", "Centroid.Z", "Group", "Cell", "Condition")) %>%
+  rename(LAC.Mean = LAC.Value)
+Unnorm_Ves_stats_tmp
+
+SXT_corr_mat <- cor(Unnorm_Ves_stats_tmp)
+SXT_corr_num <- corrplot(SXT_corr_mat, method = 'number')
+SXT_corr_circle <- corrplot(SXT_corr_mat)
+
+#png("SXT_corr_circle_highres.png", width = 2000, height = 2000, res = 300)
+#corrplot(SXT_corr_mat)  # this is the "corr_circle" plot
+#dev.off()
+```
+
+```{r}
+#Prepare correct dataset for use for figure
+
+Norm_wCluster_df <- Filter_Unnorm_Ves %>% 
+  filter(`Geometric.Diameter..nm.` != 0) %>%   #Remove weird 0 sized diameters 
+  mutate(cluster = Filter_Norm_Ves_log_clust_id$clusters) %>%
+  mutate(across(c(LAC.Value, LAC.Std.Dev, Geometric.Diameter..nm., Min.Distance.to.PM.EDT, Mito.Dist.EDT), ~ scale(.)[, 1]))  #Scale appropriate columns
+Norm_wCluster_df  
+
+Norm_wCluster_grouped <- Norm_wCluster_df %>%
+  mutate(Cell = factor(Cell, levels = paste("Cell", sort(as.numeric(gsub("Cell ", "", unique(Cell))))))) %>% #Sort cells as numerical factors, and not alphabetically 
+  group_by(Cell, cluster, Condition) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE)) %>% 
+  pivot_longer(
+    cols = -(c(Cell,cluster, Condition)),
+    names_to = "Parameter",
+    values_to = "Weighted_Z_Score"
+  )
+Norm_wCluster_grouped
+
+```
+```{r}
+#Create how well each subpopulation represents each cell
+
+facet_5labs <- c("1" = "Subpopulation 1",
+                "2" = "Subpopulation 2",
+                "3" = "Subpopulation 3",
+                "4" = "Subpopulation 4",
+                "5" = "Subpopulation 5"
+)
+
+Heatmap_AllCell <- ggplot(Norm_wCluster_grouped, aes(x = Parameter, y = Cell, fill = Weighted_Z_Score)) +
+  #main logic of graph
+  geom_tile() +
+  facet_wrap(~cluster, nrow = 2, axes = "all_x", labeller = labeller(cluster = facet_5labs)) +
+  scale_y_discrete(limits=rev) +
+
+  #color scheme
+  scale_fill_viridis_c(option = "E",
+                       limits = c(-1.0, 2.5), #limits based on 1% and 99% quantiles )
+                       oob = scales::squish, #Deals with values that are not NA values(oob function), and then clamp values to nearest limit (scales::squish)
+                       name = "Weighted Z-Score") +
+  #legend 
+  guides(
+    fill = guide_colorbar(
+    title.position = "top",
+    title.hjust = 0.5,
+    barwidth = unit(8, "cm"),
+    barheight = unit(1, "cm")
+    )
+  ) +
+  
+  #labels and sizing 
+  labs(x = "", y = "")+
+  theme_publish() +
+  theme(
+    axis.text.y = element_text(size = rel(2.5)),
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = rel(3)),
+    strip.text = element_text(size = rel(3.5)),
+    
+    legend.margin = margin(b = 0),
+    legend.title = element_text(size = rel(2.5)),
+    legend.text = element_text(size = rel(2.5))
+  ) +
+  scale_x_discrete(labels = c('Diameter','LAC Kurt','LAC Skew','LAC Std Dev.', 'LAC Mean', 'PM Dist', 'Mito Dist')) 
+
+Heatmap_AllCell
+
+#ggsave("Heatmap_AllCell_rev.png", plot = Heatmap_AllCell, width = 20, height = 35, dpi = 1000, bg = "white")
+```
+
+```{r}
+#Prepare dataset for PERMANOVA  
+Ecology_Cells <- Filter_Unnorm_Ves %>%
+  #Remove weird 0 sized diameters 
+  filter(`Geometric.Diameter..nm.` != 0) %>%   
+  #add in cluster selection, and turn into characters 
+  mutate(cluster = Filter_Norm_Ves_log_clust_id$clusters) %>% 
+  #remove parameters number
+  select(-c("LAC.Value", "LAC.Std.Dev", "LAC.Skew", "LAC.Kurtosis", "Geometric.Diameter..nm.", "Min.Distance.to.PM.EDT", "Mito.Dist.EDT")) %>%  
+  
+  group_by(Cell, Condition, cluster) %>%
+  #group by all parameters (cell, condition, cluster) and then summarise
+  summarise(TotalValue = n(), .groups = "drop") 
+    
+Ecology_Cells
+
+Ecology_Cells_wide <- Ecology_Cells %>%
+  #Correct formatting for NMDS  
+  pivot_wider(
+      names_from = cluster, 
+      values_from = TotalValue
+  ) 
+Ecology_Cells_wide
+
+Ecology_Cells_wide_nmds <- Ecology_Cells_wide %>%
+  #further formatting
+  select(-c("Cell", "Condition")) %>%
+  as.data.frame()
+Ecology_Cells_wide_nmds
+
+Ecology_Cells_wide_nmds_ratio <- (Ecology_Cells_wide_nmds / rowSums(Ecology_Cells_wide_nmds)) * 100 
+Ecology_Cells_wide_nmds_ratio
+```
+```{r}
+NMDS_res <- metaMDS(Ecology_Cells_wide_nmds_ratio, distance = "bray")
+
+
+```
+```{r}
+nmds_scores <- as.data.frame(scores(NMDS_res)$sites) 
+nmds_scores_cond <- nmds_scores %>%
+  mutate(
+  Condition = Ecology_Cells_wide$Condition
+  )
+nmds_scores_cond
+```
+```{r}
+ggplot(nmds_scores_cond, aes(x = NMDS1, y = NMDS2, color = Condition)) +
+  geom_point()
+```
+```{r}
+
+
+
+#Compute centroids per Condition
+centroids <- nmds_scores_cond %>%
+  group_by(Condition) %>%
+  summarise(
+    Centroid_X = mean(NMDS1, na.rm = TRUE),
+    Centroid_Y = mean(NMDS2, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+#Add centroid coordinates to each point (for segment drawing)
+plot_data <- nmds_scores_cond %>%
+  left_join(centroids, by = "Condition")
+
+```
+
+```{r}
+
+#Create custom levels and change EXT to Ex4
+plot_data_ggplot <- plot_data
+plot_data_ggplot$Condition <- factor(
+  dplyr::recode(as.character(plot_data_ggplot$Condition), "EXT" = "Ex4"),
+  levels = c("No Stim", "Glucose", "GLM", "GKA", "TAK", "GIP", "Ex4")
+)
+plot_data_ggplot
+#Change eXT to Ex4 
+centroids$Condition <- recode(
+  centroids$Condition,
+  "EXT" = "Ex4"
+)
+centroids
+```
+
+
+```{r}
+palette_colors <- c("No Stim"="#7b7b7b", "Glucose"="#ED1C24", "GLM"="#FFDE17",
+                    "GKA"="#8DC63F", "TAK"="#7F3F98", "GIP"="#56b4e9", "Ex4"="#1C75BC")
+
+#Plot
+NMDS_ConditionComposition <- ggplot(plot_data_ggplot, aes(x = NMDS1, y = NMDS2, color = Condition)) +
+  # points
+  geom_point(size = 7, alpha = 0.75) +
+  
+  # per-condition ellipses (filled lightly)
+  stat_ellipse(aes(group = Condition, fill = Condition),
+               geom = "polygon", alpha = 0.15, color = NA) +
+  
+  # centroid markers
+  geom_point(data = centroids,
+             aes(x = Centroid_X, y = Centroid_Y, fill = Condition),
+             inherit.aes = FALSE,
+             shape = 23, size = 8, 
+             #fill = "white", color = "black", 
+             #fill = Condition,
+             stroke = 0.6) +
+  
+  # segments from each point to its centroid
+  geom_segment(aes(xend = Centroid_X, yend = Centroid_Y),
+               alpha = 0.25, linewidth = 1.0, show.legend = FALSE) +
+  # nice palette that covers 7 groups
+  
+  scale_color_manual(values = palette_colors) +
+  scale_fill_manual(values = palette_colors) +
+  
+  coord_equal() +
+  
+  
+  labs(x = "NMDS 1", y = "NMDS 2", color = "Condition\nCentroid", fill = "Condition\nCentroid") +
+  theme_publish() +
+  theme(
+    legend.position = "right",
+    legend.title.align = 0.5,
+    panel.grid = element_blank(),
+    
+    axis.title.x = element_text(size = rel(4)),
+    axis.title.y = element_text(size = rel(4)),
+    axis.text.x = element_text(size = rel(3.5)),
+    axis.text.y = element_text(size = rel(3.5)),
+    
+    legend.title = element_text(size = rel(3.1)),   
+    legend.text = element_text(size = rel(2.8)),  
+    legend.key.size = unit(2.0, "cm")
+  )
+  
+NMDS_ConditionComposition
+#ggsave("NMDS_Condition_Composition.png", plot = NMDS_ConditionComposition, width = 20, height = 15, dpi = 500, bg = "white")
+
+```
+
+
+```{r}
+#Distance Matrix
+
+perm_dist<-vegdist(Ecology_Cells_wide_nmds_ratio, method='bray')
+
+
+#Assumptions
+
+dispersion<-betadisper(perm_dist, group=nmds_scores_cond$Condition,type = "centroid")
+
+plot(dispersion)
+
+anova(dispersion)
+
+```
+```{r}
+TukeyHSD(dispersion)
+#earlier why does TukeyHSD work with dispersion?
+```
+
+```{r}
+#Test
+
+Perma_result<-adonis2( perm_dist~as.factor(nmds_scores_cond$Condition), data=perm_dist,
+                       permutations=9999)
+
+Perma_result
+```
+
+```{r}
+#remove.packages("cli")
+#install.packages("cli")
+#install.packages('devtools')
+#library(devtools)
+#install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+```
+```{r}
+pairwise_results <- pairwise.adonis2(
+  perm_dist ~ Condition,
+  data = nmds_scores_cond,
+  permutations = 9999,
+  p.adjust.m = "BH"  # optional, if supported in your version
+)
+pairwise_results
+```
+
+
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

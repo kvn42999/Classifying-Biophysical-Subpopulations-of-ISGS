@@ -1,0 +1,1117 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(tibble)
+
+library(flexclust)
+library(parallel)
+library(ggplot2)
+library(envalysis)
+
+library(ggtext)
+library(forcats)  # For reordering factors
+library(paletteer)
+
+
+cl <- makeCluster(2, type = "PSOCK")
+clusterCall(cl, function() require("flexclust"))
+
+library(StatMatch)
+
+library(umap)
+library(uwot)
+
+
+library(ggsci)
+library(see)
+library(cluster)
+library(factoextra)
+
+library(tibble)
+
+```
+```{r}
+#Read in file and remove labels
+Filter_Raw_Unnorm_Ves <- read.csv("D:/Downloads/Drug Stimulated INS1E Cells/CSV_files/Raw_Dist/Filtered_All_Cond_Raw_Unorm_vesicles.csv")
+Filter_Raw_Unnorm_Ves
+
+Filter_Raw_Unnorm_Ves_CellCond <- Filter_Raw_Unnorm_Ves %>% 
+  select(-c(Cell, Condition, Mito.Raw.Dist.EDT)) %>%
+  filter(`Geometric.Diameter..nm.` != 0) #Remove weird 0 sized diameters 
+Filter_Raw_Unnorm_Ves_CellCond
+```
+```{r}
+hist(Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT)
+
+median(
+  Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT,
+  na.rm = TRUE
+)
+
+mean(
+  Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT,
+  na.rm = TRUE
+)
+```
+
+```{r}
+Filter_Raw_Unnorm_Ves_CellCond_75 <- Filter_Raw_Unnorm_Ves_CellCond
+Filter_Raw_Unnorm_Ves_CellCond_100 <- Filter_Raw_Unnorm_Ves_CellCond
+threshold75 = 0
+threshold100 = 100
+Filter_Raw_Unnorm_Ves_CellCond_75$Min.Raw.Distance.to.PM.EDT <- ifelse(Filter_Raw_Unnorm_Ves_CellCond_75$Min.Raw.Distance.to.PM.EDT <= threshold75, 1, 0)
+Filter_Raw_Unnorm_Ves_CellCond_75$Min.Raw.Distance.to.PM.EDT <- as.character(Filter_Raw_Unnorm_Ves_CellCond_75$Min.Raw.Distance.to.PM.EDT)
+Filter_Raw_Unnorm_Ves_CellCond_75
+
+Filter_Raw_Unnorm_Ves_CellCond_100$Min.Raw.Distance.to.PM.EDT <- ifelse(Filter_Raw_Unnorm_Ves_CellCond_100$Min.Raw.Distance.to.PM.EDT <= threshold100, 1, 0)
+Filter_Raw_Unnorm_Ves_CellCond_100$Min.Raw.Distance.to.PM.EDT <- as.character(Filter_Raw_Unnorm_Ves_CellCond_100$Min.Raw.Distance.to.PM.EDT)
+Filter_Raw_Unnorm_Ves_CellCond_100
+
+sum(Filter_Raw_Unnorm_Ves_CellCond_75$Min.Raw.Distance.to.PM.EDT == "1", na.rm = TRUE)
+sum(Filter_Raw_Unnorm_Ves_CellCond_100$Min.Raw.Distance.to.PM.EDT == "1", na.rm = TRUE)
+
+```
+
+```{r}
+#encode binary categories for PM Distances
+threshold = 50 
+Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT <- ifelse(Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT <= threshold, 1, 0)
+Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT <- as.character(Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT)
+Filter_Raw_Unnorm_Ves_CellCond
+
+sum(Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT == "1", na.rm = TRUE)
+
+
+```
+```{r}
+#Perform PCA
+
+pca_result_raw <- prcomp(Filter_Raw_Unnorm_Ves_CellCond[, -6], center = TRUE, scale. = TRUE)
+
+summary(pca_result_raw)
+
+
+fviz_eig(pca_result_raw, addlabels = TRUE, ylim = c(0, 100))
+
+```
+```{r}
+pca_result_raw$rotation
+```
+```{r}
+pca_raw <- as.data.frame(pca_result_raw$x[, 1:3])
+pca_raw
+
+pca_raw_conjoined <- pca_raw %>% 
+  mutate(PMContact = Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT)
+pca_raw_conjoined
+```
+```{r}
+var_weights_0.025 <- c(1, 1, 1, 0.025)
+var_weights_0.05 <- c(1, 1, 1, 0.05)
+var_weights_0.1 <- c(1, 1, 1, 0.1)
+var_weights_0.25 <- c(1, 1, 1, 0.25)
+
+var_weights_0.5 <- c(1, 1, 1, 0.5)
+var_weights_0.75 <- c(1, 1, 1, 0.75)
+var_weights_1.0 <- c(1, 1, 1, 1)
+
+#gowers_mat_0.50 <- gower.dist(pca_raw_conjoined, var.weights = var_weights_0.5)
+
+#gowers_mat_0.25 <- gower.dist(pca_raw_conjoined, var.weights = var_weights_0.25)
+#gowers_mat_0.1 <- gower.dist(pca_raw_conjoined, var.weights = var_weights_0.1)
+gowers_mat_0.05 <- gower.dist(pca_raw_conjoined, var.weights = var_weights_0.05)
+#gowers_mat_0.025 <- gower.dist(pca_raw_conjoined, var.weights = var_weights_0.025)
+
+```
+
+
+```{r}
+km_res_full_0.1 <- kcca(gowers_mat_0.1, k = 5, 
+  #family = kccaFamily("kmedians")
+)
+km_res_full_0.1@cluster
+```
+```{r}
+#km_res_full_0.25 <- kcca(gowers_mat_0.25, k = 5, 
+#  family = kccaFamily("kmedians")
+#  )
+
+#km_res_full_0.1 <- kcca(gowers_mat_0.1, k = 5, 
+#  family = kccaFamily("kmedians")
+#  )
+
+km_res_full_0.05 <- kcca(gowers_mat_0.05, k = 5, 
+  family = kccaFamily("kmedians")
+  )
+
+#km_res_full_0.025 <- kcca(gowers_mat_0.025, k = 5, 
+#  family = kccaFamily("kmedians")
+#  )
+```
+
+
+```{r}
+class(km_res_full_0.25)
+```
+
+```{r}
+#k-medians, final 
+
+km_res_full_0.25 
+
+Cluster_AssignGow_0.25 <- km_res_full_0.25@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign_0.25 <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign_0.25 <- FilterRaw_ClustAssign_0.25 %>% mutate(Cluster_AssignGow_0.25)
+FilterRaw_ClustAssign_0.25
+
+ClusterGow_0.25 <- FilterRaw_ClustAssign_0.25 %>% 
+  group_by(Cluster_AssignGow_0.25) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow_0.25
+```
+
+```{r}
+#k-medians, final 
+
+km_res_full_0.1
+
+Cluster_AssignGow_0.1 <- km_res_full_0.1@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign_0.1 <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign_0.1 <- FilterRaw_ClustAssign_0.1 %>% mutate(Cluster_AssignGow_0.1)
+FilterRaw_ClustAssign_0.1
+
+ClusterGow_0.1 <- FilterRaw_ClustAssign_0.1 %>% 
+  group_by(Cluster_AssignGow_0.1) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow_0.1
+```
+
+```{r}
+#k-medians, final 
+
+km_res_full_0.05
+
+Cluster_AssignGow_0.05 <- km_res_full_0.05@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign_0.05 <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign_0.05 <- FilterRaw_ClustAssign_0.05 %>% mutate(Cluster_AssignGow_0.05)
+FilterRaw_ClustAssign_0.05
+
+ClusterGow_0.05 <- FilterRaw_ClustAssign_0.05 %>% 
+  group_by(Cluster_AssignGow_0.05) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow_0.05
+
+
+```
+
+```{r}
+#k-medians, final 
+
+km_res_full_0.025
+
+Cluster_AssignGow_0.025 <- km_res_full_0.025@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign_0.025 <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign_0.025 <- FilterRaw_ClustAssign_0.025 %>% mutate(Cluster_AssignGow_0.025)
+FilterRaw_ClustAssign_0.025
+
+ClusterGow_0.025 <- FilterRaw_ClustAssign_0.025 %>% 
+  group_by(Cluster_AssignGow_0.025) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow_0.025
+```
+
+```{r}
+#Add cluster assignments to df
+
+Cluster_AssignGow <- km_res_full_0.1@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign <- FilterRaw_ClustAssign %>% mutate(Cluster_AssignGow)
+FilterRaw_ClustAssign
+```
+```{r}
+ClusterGow <- FilterRaw_ClustAssign %>% 
+  group_by(Cluster_AssignGow) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow
+```
+
+
+```{r}
+Cluster_AssignGow_0.25 <- km_res_full_0.25@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign_0.25 <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign_0.25 <- FilterRaw_ClustAssign_0.25 %>% mutate(Cluster_AssignGow_0.25)
+FilterRaw_ClustAssign_0.25
+
+ClusterGow_0.25 <- FilterRaw_ClustAssign_0.25 %>% 
+  group_by(Cluster_AssignGow_0.25) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow_0.25
+```
+
+
+```{r}
+#Only one not valid- used wrong dataset initially 
+
+Cluster_AssignGow_0.50 <- km_res_full_0.50@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign_0.50 <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign_0.50 <- FilterRaw_ClustAssign_0.50 %>% mutate(Cluster_AssignGow_0.50)
+FilterRaw_ClustAssign_0.50
+
+ClusterGow_0.50 <- FilterRaw_ClustAssign_0.50 %>% 
+  group_by(Cluster_AssignGow_0.50) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow_0.50
+```
+
+```{r}
+Cluster_AssignGow_0.05 <- km_res_full_0.05@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign_0.05 <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign_0.05 <- FilterRaw_ClustAssign_0.05 %>% mutate(Cluster_AssignGow_0.05)
+FilterRaw_ClustAssign_0.05
+
+ClusterGow_0.05 <- FilterRaw_ClustAssign_0.05 %>% 
+  group_by(Cluster_AssignGow_0.05) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow_0.05
+```
+
+```{r}
+Cluster_AssignGow_0.025 <- km_res_full_0.025@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign_0.025 <- Filter_Raw_Unnorm_Ves_CellCond %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign_0.025 <- FilterRaw_ClustAssign_0.025 %>% mutate(Cluster_AssignGow_0.025)
+FilterRaw_ClustAssign_0.025
+
+ClusterGow_0.025 <- FilterRaw_ClustAssign_0.025 %>% 
+  group_by(Cluster_AssignGow_0.025) %>%
+  summarise(
+    n = n(),
+    RatioPMContact = mean(Min.Raw.Distance.to.PM.EDT == 1),
+    across(where(is.numeric), mean, na.rm = TRUE)
+)
+
+ClusterGow_0.025
+```
+
+```{r}
+
+#ClusterGow_0.1 <- tibble(
+#  Cluster = c(1, 2, 3, 4, 5),
+#  n = c(4906, 1118, 3308, 12476, 15098),
+#  RatioPMContact = c(0.0000000, 0.2423971, 0.6094317, 0.0000000, 0.0000000),
+#  LAC.Value = c(0.3785873, 0.4120842, 0.3219082, 0.3137881, 0.3363374),
+#  LAC.Std.Dev = c(0.02653050, 0.04515505, 0.01708459, 0.01457369, 0.01892533),
+#  LAC.Skew = c(0.32998327, 0.28929290, -0.04771118, -0.03841677, 0.22595049),
+#  LAC.Kurtosis = c(-0.274983811, -0.147133148, -0.007878572, -0.413397219, -0.326156184),
+#  Geometric.Diameter..nm. = c(204.1093, 280.6716, 124.8216, 104.9902, 142.5861)
+#)
+ClusterGow_0.1 <- tibble(
+  Cluster = c(1, 2, 3, 4, 5),
+  n = c(6496, 11550, 11871, 4441, 2548),
+  RatioPMContact = c(0.0000000, 0.0000000, 0.0000000, 0.3386625, 0.3072998),
+  LAC.Value = c(0.3664540, 0.3147109, 0.3340143, 0.3140559, 0.3926893),
+  LAC.Std.Dev = c(0.02378071, 0.01490126, 0.01860666, 0.01492156, 0.03570580),
+  LAC.Skew = c(0.316743366, 0.004826368, 0.208904388, -0.133186246, 0.280564533),
+  LAC.Kurtosis = c(-0.2379582, -0.4355989, -0.3509979, -0.1141773, -0.1455166),
+  Geometric.Diameter..nm. = c(183.4726, 108.0623, 140.2346, 105.7854, 241.8400)
+)
+
+#ClusterGow_0.25 <- tibble(
+#  Cluster = c(1, 2, 3, 4, 5),
+#  n = c(1554, 2450, 7379, 17896, 7627),
+#  RatioPMContact = c(0.0000000, 0.9334694, 0.0000000, 0.0000000, 0.0000000),
+#  LAC.Value = c(0.4047743, 0.3370280, 0.3122007, 0.3262605, 0.3643044),
+#  LAC.Std.Dev = c(0.03733837, 0.02353840, 0.01378082, 0.01722907, 0.02346935),
+#  LAC.Skew = c(0.3130831, 0.1249360, -0.1743647, 0.1562007, 0.3166718),
+#  LAC.Kurtosis = c(-0.2277158, -0.2265885, -0.2769019, -0.3821973, -0.2398588),
+#  Geometric.Diameter..nm. = c(256.06050, 166.26046, 96.22057, 128.41491, 180.58248)
+#)
+
+ClusterGow_0.25 <- tibble(
+  Cluster = c(1, 2, 3, 4, 5),
+  n = c(13103, 2963, 7484, 3830, 9526),
+  RatioPMContact = c(0.0000000, 0.7718529, 0.0000000, 0.0000000, 0.0000000),
+  LAC.Value = c(0.3215661, 0.3500464, 0.3123695, 0.3824167, 0.3488009),
+  LAC.Std.Dev = c(0.01648408, 0.02708169, 0.01383086, 0.02802918, 0.02074512),
+  LAC.Skew = c(0.1158827, 0.1351990, -0.1551397, 0.3566985, 0.2721516),
+  LAC.Kurtosis = c(-0.4174066, -0.2130979, -0.2892481, -0.1844904, -0.2781292),
+  Geometric.Diameter..nm. = c(122.2428, 185.3150, 96.4616, 210.7523, 158.5921)
+)
+
+#ClusterGow_0.025 <- tibble(
+#  Cluster = c(1, 2, 3, 4, 5),
+#  n = c(11015, 16491, 5285, 724, 3391),
+#  RatioPMContact = c(0.06790740, 0.04159845, 0.07057711, 0.10220994, 0.11972869),
+#  LAC.Value = c(0.3487746, 0.3192287, 0.3129974, 0.4150758, 0.3877661),
+#  LAC.Std.Dev = c(0.02096225, 0.01612127, 0.01369783, 0.04898651, 0.02951917),
+#  LAC.Skew = c(0.2736269, 0.1021514, -0.2595174, 0.1790408, 0.3715591),
+#  LAC.Kurtosis = c(-0.2720525, -0.4153376, -0.1662886, 0.0273543, -0.2702612),
+#  Geometric.Diameter..nm. = c(160.64085, 119.01144, 93.85072, 284.90614, 223.04153)
+#)
+
+ClusterGow_0.025 <- tibble(
+  Cluster = c(1, 2, 3, 4, 5),
+  n = c(1776, 10679, 5366, 12499, 6586),
+  RatioPMContact = c(0.11768018, 0.05431220, 0.10454715, 0.03624290, 0.07348922),
+  LAC.Value = c(0.3998614, 0.3411722, 0.3710594, 0.3180822, 0.3120907),
+  LAC.Std.Dev = c(0.03881468, 0.01977359, 0.02502847, 0.01593634, 0.01383627),
+  
+  LAC.Skew = c(0.21068368, 0.24632381, 0.34320517, 0.08361356, -0.17837523),
+  LAC.Kurtosis = c(-0.02898098, -0.30872220, -0.20907491, -0.43602986, -0.25832520),
+  Geometric.Diameter..nm. = c(251.05948, 150.54654, 192.55308, 117.79514, 95.89343)
+)
+
+#ClusterGow_0.05 <- tibble(
+#  Cluster = c(1, 2, 3, 4, 5),
+#  n = c(3421, 751, 5771, 16198, 10765),
+#  RatioPMContact = c(0.16515639, 0.13981358, 0.13567839, 0.01284109, 0.05815142),
+#  LAC.Value = c(0.3863223, 0.4135017, 0.3124190, 0.3199123, 0.3491609),
+#  LAC.Std.Dev = c(0.02933043, 0.04833476, 0.01390574, 0.01615759, 0.02100365),
+#  LAC.Skew = c(0.36716291, 0.17847654, -0.21727242, 0.09947784, 0.27580572),
+#  LAC.Kurtosis = c(-0.27120196, 0.03693274, -0.17941747, -0.41883561, -0.26955083),
+#  Geometric.Diameter..nm. = c(221.49092, 283.37448, 96.18621, 119.19208, 161.11333)
+#)
+
+ClusterGow_0.05 <- tibble(
+  Cluster = c(1, 2, 3, 4, 5),
+  n = c(10281, 11997, 5669, 7093, 1866),
+  RatioPMContact = c(0.01741076, 0.00000000, 0.14799788, 0.13661356, 0.16077170),
+  LAC.Value = c(0.3415062, 0.3183959, 0.3684918, 0.3119873, 0.3982031),
+  LAC.Std.Dev = c(0.01973639, 0.01588191, 0.02468980, 0.01409045, 0.03824150),
+  LAC.Skew = c(0.2465324, 0.0779820, 0.3347558, -0.1482183, 0.2143858),
+  LAC.Kurtosis = c(-0.31175103, -0.43535381, -0.21790364, -0.26681224, -0.03517176),
+  Geometric.Diameter..nm. = c(150.10587, 117.32509, 189.92144, 98.27594, 249.81781)
+)
+
+ClusterGow_0.025
+ClusterGow_0.05
+ClusterGow_0.1
+ClusterGow_0.25
+
+#To convery them in graphical form, change to z-score format 
+```
+
+```{r}
+Filter_Raw_Unnorm_Ves_CellCond
+#calculate sd and mean for every column 
+Filter_Raw_Unnorm_Ves_CellCond[,-6]
+std_devs <- sapply(Filter_Raw_Unnorm_Ves_CellCond[,-6], sd)
+means <- sapply(Filter_Raw_Unnorm_Ves_CellCond[,-6], mean)
+
+```
+```{r}
+ClusterGow_0.025[-c(1,2,3)]
+std_devs
+means
+#ClusterGow_0.025
+#ClusterGow_0.05
+#ClusterGow_0.1
+#ClusterGow_0.25
+
+#ClusterGow_0.25_normdf <- as.data.frame(scale(ClusterGow_0.25[-c(1,2,3)], center = means, scale = std_devs)) #%>%
+  #mutate(Gow_Cluster = c(1,2,3,4,5))
+
+###weight = 0.25 
+recluster_id_0.25 <- c("3" = "1",
+                  "1" = "2",
+                  "5" = "3",
+                  "2" = "4",
+                  "4" = "5"
+                  )
+ClusterGow_0.25_normdf <- ClusterGow_0.25 %>%
+  #Normalize variables 
+  mutate(
+    across(
+      -c(1,2,3),
+      ~ (.x - means[cur_column()]) / std_devs[cur_column()])) %>%
+  mutate(n_pct = 100 * n / sum(n)) %>%
+  mutate(Cluster = recode(Cluster, !!!recluster_id_0.25))
+
+
+###Weight = 0.1  
+recluster_id_0.1 <- c("4" = "1",
+                  "2" = "2",
+                  "3" = "3",
+                  "1" = "4",
+                  "5" = "5"
+                  )
+ClusterGow_0.1_normdf <- ClusterGow_0.1 %>%
+  mutate(
+    across(
+      -c(1,2,3),
+      ~ (.x - means[cur_column()]) / std_devs[cur_column()])) %>%
+  mutate(n_pct = 100 * n / sum(n)) %>%
+  mutate(Cluster = recode(Cluster, !!!recluster_id_0.1))
+
+###Weight = 0.05 
+recluster_id_0.05 <- c("4" = "1",
+                  "2" = "2",
+                  "1" = "3",
+                  "3" = "4",
+                  "5" = "5"
+                  )
+ClusterGow_0.05_normdf <- ClusterGow_0.05 %>%
+  mutate(
+    across(
+      -c(1,2,3),
+      ~ (.x - means[cur_column()]) / std_devs[cur_column()])) %>%
+  mutate(n_pct = 100 * n / sum(n)) %>%
+  mutate(Cluster = recode(Cluster, !!!recluster_id_0.05))
+
+###weight = 0.025
+recluster_id_0.025 <- c("5" = "1",
+                  "4" = "2",
+                  "2" = "3",
+                  "3" = "4",
+                  "1" = "5"
+                  )
+ClusterGow_0.025_normdf <- ClusterGow_0.025 %>%
+  mutate(
+    across(
+      -c(1,2,3),
+      ~ (.x - means[cur_column()]) / std_devs[cur_column()]))%>%
+  mutate(n_pct = 100 * n / sum(n)) %>%
+  mutate(Cluster = recode(Cluster, !!!recluster_id_0.025))
+
+ClusterGow_0.25_normdf
+ClusterGow_0.1_normdf
+ClusterGow_0.05_normdf
+ClusterGow_0.025_normdf
+```
+```{r}
+ClusterGow_0.25_normdf_graph <- ClusterGow_0.25_normdf[-c(2,3,9)] %>% pivot_longer(
+    cols = -(c(Cluster)),
+    names_to = "Parameter",
+    values_to = "Z_Score"
+  )
+ClusterGow_0.1_normdf_graph <- ClusterGow_0.1_normdf[-c(2,3,9)] %>% pivot_longer(
+    cols = -(c(Cluster)),
+    names_to = "Parameter",
+    values_to = "Z_Score"
+  )
+ClusterGow_0.05_normdf_graph <- ClusterGow_0.05_normdf[-c(2,3,9)] %>% pivot_longer(
+    cols = -(c(Cluster)),
+    names_to = "Parameter",
+    values_to = "Z_Score"
+  )
+ClusterGow_0.025_normdf_graph <- ClusterGow_0.025_normdf[-c(2,3,9)] %>% pivot_longer(
+    cols = -(c(Cluster)),
+    names_to = "Parameter",
+    values_to = "Z_Score"
+  )
+
+ClusterGow_0.25_normdf_graph
+ClusterGow_0.1_normdf_graph
+ClusterGow_0.05_normdf_graph
+ClusterGow_0.025_normdf_graph
+```
+
+```{r}
+#Parameter labels 
+cust_param_labels_gow <-  c(
+    "Mito.Raw.Dist.EDT" = "Distance from Mito",
+    "LAC.Value" = "LAC Mean",
+    "LAC.Std.Dev" = "LAC Std. Dev.",
+    "Geometric.Diameter..nm." = "Granule Diameter",
+    "LAC.Skew" = "LAC Skew",
+    "LAC.Kurtosis" = "LAC Kurtosis"
+  )
+
+facet_labs_0.25 <- c(
+  "1" = "Cluster 1 (20% total) <br> 0% Docked",
+  "2" = "Cluster 2 (36% total) <br> 0% Docked",
+  "3" = "Cluster 3 (26% total) <br> 0% Docked",
+  "4" = "Cluster 4 (8% total) <br> **77% Docked**",
+  "5" = "Cluster 5 (10% total) <br> 0% Docked"
+)
+
+#what parameters to show + order
+show_col_gow <- rev(c("LAC.Value", "Geometric.Diameter..nm.", "LAC.Std.Dev", "LAC.Skew"))
+
+#ggplot
+Gow_bar_0.25 <- ggplot(ClusterGow_0.25_normdf_graph, 
+                          aes(x = Parameter, 
+                              y = Z_Score, 
+                              fill = Cluster
+                              )) +
+#graph logic
+  geom_col(aes(y = Z_Score - (-1) )) +
+  scale_y_continuous(labels = function(x) x + (-1),
+                     breaks = c(0,0.5,1,1.5,2,2.5,3,3.5),
+                     limits = c(0, NA),        # Start from 0, auto upper limit
+                     expand = c(0, 0) 
+                     ) +
+  
+  facet_wrap(~Cluster, nrow = 1, labeller = as_labeller(facet_labs_0.25)) +
+  scale_x_discrete(labels = cust_param_labels_gow, limits = show_col_gow) +
+  coord_flip() +
+  
+  scale_fill_okabeito() +
+
+#graph design
+  guides(fill = FALSE) +
+  labs(y = "Z-Score", x = "") + 
+  theme_publish() +
+  
+  theme(
+    #strip.background = element_rect(fill = "bisque"),
+    strip.text.x = element_markdown(size = rel(1.65), hjust = 0.5),
+    axis.title.x = element_text(size = rel(2), hjust = 0.5),
+    axis.text.x = element_text(size = rel(1.5)),
+    axis.text.y = element_text(size = rel(1.5)),
+    #plot.margin = margin(5.5, 11.0, 5.5, 5.5)
+  ) 
+
+Gow_bar_0.25
+```
+```{r}
+facet_labs_0.1 <- c(
+  "1" = "Cluster 1 (12% total) <br> **34% Docked**",
+  "2" = "Cluster 2 (31% total) <br> 0% Docked",
+  "3" = "Cluster 3 (32% total) <br> 0% Docked",
+  "4" = "Cluster 4 (18% total) <br> 0% Docked",
+  "5" = "Cluster 5 (7% total) <br> **30% Docked**"
+)
+
+facet_labs_0.05 <- c(
+  "1" = "Cluster 1 (19% total) <br> **14% Docked**",
+  "2" = "Cluster 2 (33% total) <br> 0% Docked",
+  "3" = "Cluster 3 (28% total) <br> **2% Docked**",
+  "4" = "Cluster 4 (15% total)  <br> **15% Docked**",
+  "5" = "Cluster 5 (5% total) <br> **16% Docked**"
+)
+
+facet_labs_0.025 <- c(
+  "1" = "Cluster 1 (18% total) <br> **7% Docked**",
+  "2" = "Cluster 2 (34% total) <br> **4% Docked**",
+  "3" = "Cluster 3 (29% total) <br> **5% Docked**",
+  "4" = "Cluster 4 (15% total)  <br> **10% Docked**",
+  "5" = "Cluster 5 (5% total) <br> **12% Docked**"
+)
+
+Gow_bar_0.1 <- Gow_bar_0.25 %+% ClusterGow_0.1_normdf_graph + facet_wrap(~Cluster, nrow = 1, labeller = as_labeller(facet_labs_0.1)) 
+Gow_bar_0.05 <- Gow_bar_0.25 %+% ClusterGow_0.05_normdf_graph + facet_wrap(~Cluster, nrow = 1, labeller = as_labeller(facet_labs_0.05)) 
+Gow_bar_0.025 <- Gow_bar_0.25 %+% ClusterGow_0.025_normdf_graph + facet_wrap(~Cluster, nrow = 1, labeller = as_labeller(facet_labs_0.025)) 
+
+Gow_bar_0.1
+Gow_bar_0.05
+Gow_bar_0.025
+```
+
+```{r}
+ggsave("Gow_bar_0.25_rev.png", plot = Gow_bar_0.25, width = 20, height = 4, dpi = 1000, bg = "White")
+ggsave("Gow_bar_0.1_rev.png", plot = Gow_bar_0.1, width = 20, height = 4, dpi = 1000, bg = "White")
+ggsave("Gow_bar_0.05_rev.png", plot = Gow_bar_0.05, width = 20, height = 4, dpi = 1000, bg = "White")
+ggsave("Gow_bar_0.025_rev.png", plot = Gow_bar_0.025, width = 20, height = 4, dpi = 1000, bg = "White")
+
+```
+
+
+```{r}
+#Adding final cluster assignments to df
+
+Cluster_AssignGow <- km_res_full_0.05@cluster
+#Cluster_assigngow
+FilterRaw_ClustAssign <- Filter_Raw_Unnorm_Ves %>%
+   select(-c(Cell, Mito.Raw.Dist.EDT)) %>%
+   filter(`Geometric.Diameter..nm.` != 0)
+FilterRaw_ClustAssign <- FilterRaw_ClustAssign %>% mutate(Cluster_AssignGow)
+#Binary encoding
+threshold = 50 
+FilterRaw_ClustAssign$Min.Raw.Distance.to.PM.EDT <- ifelse(Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT <= threshold, 1, 0)
+FilterRaw_ClustAssign$Min.Raw.Distance.to.PM.EDT <- as.character(Filter_Raw_Unnorm_Ves_CellCond$Min.Raw.Distance.to.PM.EDT)
+FilterRaw_ClustAssign
+
+###Re-id columns, normalize values, select only relevant docked subclusters 
+recluster_id_0.05_custom <- c("5" = "1", #14
+                  "4" = "2", #0%
+                  "2" = "3", #2%
+                  "3" = "4", #15
+                  "1" = "5" #16%
+                  )
+FilterRaw_ClustAssign_norm_reid <- FilterRaw_ClustAssign %>%
+  filter(substr(as.character(Min.Raw.Distance.to.PM.EDT), 1, 1) == "1") %>%
+  mutate(
+    across(
+      c(1,2,3,4,5),
+      ~ (.x - means[cur_column()]) / std_devs[cur_column()])) %>%
+  mutate(Cluster_AssignGow = recode(Cluster_AssignGow, !!!recluster_id_0.05_custom)) %>%
+  select(-Min.Raw.Distance.to.PM.EDT) %>%
+  filter(!Cluster_AssignGow %in% c(2, 3))
+
+FilterRaw_ClustAssign_norm_reid
+
+#Long format
+FilterRaw_ClustAssign_norm_reid_long <- FilterRaw_ClustAssign_norm_reid %>% group_by(Cluster_AssignGow) %>%
+  select(-c(Condition)) %>%
+  summarise(
+    #n = n(),
+    across(where(is.numeric), mean, na.rm = TRUE)) %>%
+  pivot_longer(
+    cols = -(c(Cluster_AssignGow)),
+    names_to = "Parameter",
+    values_to = "Z_Score"
+  ) %>%
+  rename(Cluster = Cluster_AssignGow)
+FilterRaw_ClustAssign_norm_reid_long
+```
+```{r}
+facet_labs_docked <- c(
+  "1" = "Docked Class 1 <br> (46%)",
+  "4" = "Docked Class 2 <br> (40%)",
+  "5" = "Docked Class 3 <br> (14%)"
+)
+Dockedbar_0.05 <- Gow_bar_0.25 %+% FilterRaw_ClustAssign_norm_reid_long + facet_wrap(~Cluster, nrow = 1, labeller = as_labeller(facet_labs_docked))+ theme(axis.title.x = element_text(size = rel(1.6), hjust = 0.5))
+   
+Dockedbar_0.05
+
+ggsave("Dockedbar_bar_rev.png", plot = Dockedbar_0.05, width = 10.5, height = 4, dpi = 1000, bg = "White")
+
+#5 = 300 (14%), 4 = 839 (40%), 1 = 969(46%)
+```
+
+```{r}
+#Conditions (used for some sort of parameter determination)
+#Code has some issues tbh 
+
+FilterRaw_ClustAssign
+#Same as earlier, but resample to normalize for number of granules 
+FilterRaw_ClustAssign_norm_reid_adjust <- FilterRaw_ClustAssign %>%
+  
+  #norm for number of granules
+  
+  #group_by(Condition) %>%
+  #slice_sample(n = 2000) %>%
+  #ungroup() %>%
+  
+  #re-id, normalize, etc. 
+  filter(substr(as.character(Min.Raw.Distance.to.PM.EDT), 1, 1) == "1") %>%
+  mutate(
+    across(
+      c(1,2,3,4,5),
+      ~ (.x - means[cur_column()]) / std_devs[cur_column()])) %>%
+  mutate(Cluster_AssignGow = recode(Cluster_AssignGow, !!!recluster_id_0.05_custom)) %>%
+  select(-Min.Raw.Distance.to.PM.EDT) %>%
+  filter(!Cluster_AssignGow %in% c(2, 3))
+
+FilterRaw_ClustAssign_norm_reid_adjust
+
+#Summarize 
+FilterRaw_ClustAssign_norm_reid_Cond_long <- FilterRaw_ClustAssign_norm_reid_adjust %>%
+  group_by(Condition, Cluster_AssignGow) %>%
+  summarise(
+    n = n(),
+    across(where(is.numeric), mean, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  ungroup() %>%
+  mutate(percentage = n / sum(n) * 100)
+
+
+FilterRaw_ClustAssign_norm_reid_Cond_long
+```
+```{r}
+#Conditions (Used for counts)
+
+FilterRaw_ClustAssign
+#Same as earlier, but resample to normalize for number of granules 
+FilterRaw_ClustAssign_norm_reid_adjust <- FilterRaw_ClustAssign %>%
+  #remove irrelevant columns 
+  select(-c("LAC.Value", "LAC.Std.Dev", "LAC.Skew", "LAC.Kurtosis", "Geometric.Diameter..nm.")) %>%
+  
+  #norm for number of granules
+  group_by(Condition) %>%
+  slice_sample(n = 2000) %>%
+  ungroup() %>%
+  
+  #filter out greater than 50 nm ISGs
+  mutate(Min.Raw.Distance.to.PM.EDT = as.numeric(Min.Raw.Distance.to.PM.EDT)) %>%
+  filter(Min.Raw.Distance.to.PM.EDT <= 50) %>%
+  select(-c(Min.Raw.Distance.to.PM.EDT)) %>%
+
+  #re-id, normalize, etc. 
+  mutate(Cluster_AssignGow = recode(Cluster_AssignGow, !!!recluster_id_0.05_custom)) %>%
+  filter(!Cluster_AssignGow %in% c(2, 3))
+
+FilterRaw_ClustAssign_norm_reid_adjust
+
+#Summarize 
+FilterRaw_ClustAssign_norm_reid_Cond_long <- FilterRaw_ClustAssign_norm_reid_adjust %>%
+  group_by(Condition, Cluster_AssignGow) %>%
+  summarise(
+    n = n(),
+    across(where(is.numeric), mean, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  ungroup() %>%
+  mutate(percentage = n / sum(n) * 100)
+
+
+FilterRaw_ClustAssign_norm_reid_Cond_long
+```
+
+
+```{r}
+facet_condition_labels <- c(
+  "No Stim" = "No Stim",
+  "Glucose" = "Glucose",
+  "GLM" = "GLM",
+  "GKA" = "GKA",
+  "TAK" = "TAK",
+  "GIP" = "GIP",
+  "EXT" = "Ex-4"  # <-- This changes just this one
+)
+
+#ggplot
+GowerCond_Shifts <- ggplot(FilterRaw_ClustAssign_norm_reid_Cond_long, aes(x = Cluster_AssignGow, y = percentage, fill = Cluster_AssignGow)) +
+
+#Graph logic
+  geom_bar(stat = "identity") +
+  facet_wrap(~ fct_relevel(Condition, "No Stim", "Glucose", "GLM", "GKA", "TAK", "GIP", "EXT"), nrow = 2, 
+              labeller = as_labeller(facet_condition_labels), axes = "all_x"
+              ) +
+  scale_fill_okabeito() +
+  scale_y_continuous(expand = c(0, 0)) +
+ scale_x_discrete(labels = c("1","2","3")) +
+
+#Graph design 
+  guides(fill = "none") +
+  theme_publish() +
+  labs(x = "Docked Classes", y = "Percentage") +
+  theme(
+    #strip.background = element_rect(fill = "bisque"),
+   strip.text.x = element_markdown(size = rel(2), hjust = 0.5),
+    axis.title.x = element_text(size = rel(2.2), hjust = 0.5),
+    axis.title.y = element_text(size = rel(2.2)),
+    axis.text.x = element_text(size = rel(2.2)),
+    axis.text.y = element_text(size = rel(2.2)),
+    plot.margin = margin(5.5, 5.5, 5.5, 20)
+  ) 
+
+
+GowerCond_Shifts
+
+#ggsave("test_GowerCond_Shifts_rev.png", plot = GowerCond_Shifts, width = 12, height = 7, dpi = 1000, bg = "White")
+
+```
+
+```{r}
+#Make sure cluster assignments are correct! 
+
+Filter_Raw_Unnorm_Ves
+
+#Using error bars 
+EB_FilterRaw_ClustAssign <- Filter_Raw_Unnorm_Ves %>%
+  select(-Mito.Raw.Dist.EDT) %>%
+  filter(`Geometric.Diameter..nm.` != 0) %>%
+  mutate(Cluster_AssignGow = Cluster_AssignGow)
+
+
+#Conditions (Used for counts)
+
+EB_FilterRaw_ClustAssign
+#Same as earlier, but resample to normalize for number of granules 
+EB_FilterRaw_ClustAssign_norm_reid_adjust <- EB_FilterRaw_ClustAssign %>%
+  #remove irrelevant columns 
+  select(-c("LAC.Value", "LAC.Std.Dev", "LAC.Skew", "LAC.Kurtosis", "Geometric.Diameter..nm.")) %>%
+  
+  #norm for number of granules
+  group_by(Condition) %>%
+  slice_sample(n = 2000) %>%
+  ungroup() %>%
+  
+  #filter out greater than 50 nm ISGs
+  mutate(Min.Raw.Distance.to.PM.EDT = as.numeric(Min.Raw.Distance.to.PM.EDT)) %>%
+  filter(Min.Raw.Distance.to.PM.EDT <= 50) %>%
+  select(-c(Min.Raw.Distance.to.PM.EDT)) %>%
+  
+  #re-id, normalize, etc. 
+  mutate(Cluster_AssignGow = recode(Cluster_AssignGow, !!!recluster_id_0.05_custom)) %>%
+  filter(!Cluster_AssignGow %in% c(2, 3))
+
+  
+EB_FilterRaw_ClustAssign_norm_reid_adjust
+
+#Summarize 
+EB_FilterRaw_ClustAssign_norm_reid_Cond_long <- EB_FilterRaw_ClustAssign_norm_reid_adjust %>%
+  group_by(Condition, Cluster_AssignGow, Cell) %>%
+  summarise(
+    n = n(),
+    across(where(is.numeric), mean, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  ungroup() %>%
+  mutate(percentage = n / sum(n) * 100)
+
+
+EB_FilterRaw_ClustAssign_norm_reid_Cond_long
+```
+```{r}
+############################################
+okabeito <- c(
+  "#E69F00",
+  "#56B4E9",
+  "#009E73"
+)
+
+okabeito_dark <- c(
+  "#B67E00",
+  "#2F8BC0",
+  "#007A59"
+)
+
+#ggplot
+facet_condition_labels <- c(
+  "No Stim" = "No Stim",
+  "Glucose" = "Glucose",
+  "GLM" = "GLM",
+  "GKA" = "GKA",
+  "TAK" = "TAK",
+  "GIP" = "GIP",
+  "EXT" = "Ex-4"
+)
+
+GowerCond_Shifts_EB <- ggplot(
+  EB_FilterRaw_ClustAssign_norm_reid_Cond_long,
+  aes(x = Cluster_AssignGow, y = percentage)
+) +
+
+  # Mean bars
+  stat_summary(
+    fun = mean,
+    geom = "bar",
+    aes(fill = Cluster_AssignGow),
+    width = 0.8
+  ) +
+
+  # Error bars: mean ± SEM
+  stat_summary(
+    fun.data = mean_se,
+    geom = "errorbar",
+    aes(colour = Cluster_AssignGow),
+    width = 0.2,
+    linewidth = 1.4
+  ) +
+
+  facet_wrap(
+    ~ fct_relevel(
+        Condition,
+        "No Stim", "Glucose", "GLM", "GKA", "TAK", "GIP", "EXT"
+      ),
+    nrow = 2,
+    labeller = as_labeller(facet_condition_labels),
+    axes = "all_x"
+  ) +
+
+  scale_fill_okabeito() +
+  scale_colour_manual(values = okabeito_dark) +
+  
+  #Make sure region of the graph is good here! 
+  scale_y_continuous(
+  expand = expansion(
+    add = c(0, 0.05 * max(EB_FilterRaw_ClustAssign_norm_reid_Cond_long$percentage))
+  )
+  ) +
+
+  
+  scale_x_discrete(labels = c("1", "2", "3")) +
+
+  guides(fill = "none", colour = "none") +
+  theme_publish() +
+  labs(x = "Docked Classes", y = "Percentage of all Docked ISGs") +
+  theme(
+    strip.text.x  = element_markdown(size = rel(2), hjust = 0.5),
+    axis.title.x  = element_text(size = rel(2.2), hjust = 0.5),
+    axis.title.y  = element_text(size = rel(2.2)),
+    axis.text.x   = element_text(size = rel(2.2)),
+    axis.text.y   = element_text(size = rel(2.2)),
+    plot.margin   = margin(5.5, 5.5, 5.5, 20)
+  )
+
+GowerCond_Shifts_EB
+
+ggsave("EB_GowerCond_Shifts_rev.png", plot = GowerCond_Shifts_EB, width = 12, height = 7, dpi = 1000, bg = "White")
+
+```
+
+```{r}
+Cluster_AssignGow
+
+```
+
+```{r}
+#save cluster assignments 
+write.csv(
+  data.frame(Cluster_AssignGow = Cluster_AssignGow),
+  file = "Cluster_AssignGow_0.05.csv",
+  row.names = FALSE
+)
+```
+
+```{r}
+Filter_Raw_Unnorm_Ves
+#PERMANOVA dataframe
+
+#Steps 1 including cells
+GowerPERMANOVA <- Filter_Raw_Unnorm_Ves %>%
+  filter(`Geometric.Diameter..nm.` != 0) %>%
+  select(-c("LAC.Value", "LAC.Std.Dev", "LAC.Skew", "LAC.Kurtosis", "Geometric.Diameter..nm.", "Mito.Raw.Dist.EDT")) 
+GowerPERMANOVA <- GowerPERMANOVA %>% mutate(Cluster_AssignGow)
+GowerPERMANOVA
+
+#Steps 1.5 
+GowerPERMANOVA_int <- GowerPERMANOVA %>%
+  filter(Min.Raw.Distance.to.PM.EDT <= 50) %>%
+  select(-c(Min.Raw.Distance.to.PM.EDT)) 
+GowerPERMANOVA_int
+
+#Step 2 grouping appropriately 
+GowerPERMANOVA_group <- GowerPERMANOVA_int %>%
+  #Group together things
+  group_by(Cell, Condition, Cluster_AssignGow) %>%
+  #group by all parameters (cell, condition, cluster) and then summarise
+  summarise(TotalValue = n(), .groups = "drop") 
+GowerPERMANOVA_group
+
+#step 3 
+GowerPERMANOVA_group_wide <- GowerPERMANOVA_group %>%
+  #Correct formatting for NMDS  
+  pivot_wider(
+      names_from = Cluster_AssignGow, 
+      values_from = TotalValue
+  )
+#fill in N/A as zeros 
+GowerPERMANOVA_group_wide[is.na(GowerPERMANOVA_group_wide)] <- 0
+GowerPERMANOVA_group_wide
+
+
+GowerPERMANOVA_group_wide_nmds <- GowerPERMANOVA_group_wide%>%
+  select(-c("Cell", "Condition")) %>%
+  as.data.frame()
+GowerPERMANOVA_group_wide_nmds
+
+GowerPERMANOVA_group_wide_ratio <- (GowerPERMANOVA_group_wide_nmds / rowSums(GowerPERMANOVA_group_wide_nmds)) * 100 
+GowerPERMANOVA_group_wide_ratio
+```
+```{r}
+NMDS_res_gower <- metaMDS(GowerPERMANOVA_group_wide_ratio, distance = "bray")
+
+nmds_scores_gow <- as.data.frame(scores(NMDS_res_gower)$sites) 
+nmds_scores_gow_cond <- nmds_scores_gow %>%
+  mutate(
+  Condition = GowerPERMANOVA_group_wide$Condition
+  )
+nmds_scores_gow_cond
+
+ggplot(nmds_scores_gow_cond, aes(x = NMDS1, y = NMDS2, color = Condition)) +
+  geom_point()
+```
+```{r}
+#Dispersion?
+#Distance Matrix
+
+perm_dist_gow <-vegdist(GowerPERMANOVA_group_wide_ratio, method='bray')
+
+
+#Assumptions
+
+dispersion_gow<-betadisper(perm_dist_gow, group=nmds_scores_gow_cond$Condition,type = "centroid")
+
+plot(dispersion_gow)
+
+anova(dispersion_gow)
+
+TukeyHSD(dispersion_gow)
+
+```
+```{r}
+#PERMANOVA test
+Perma_result_gow<-adonis2( perm_dist~as.factor(nmds_scores_gow_cond$Condition), data=perm_dist_gow,
+                       permutations=9999)
+
+Perma_result_gow
+```
+```{r}
+pairwise_results_gow <- pairwise.adonis2(
+  perm_dist ~ Condition,
+  data = nmds_scores_gow_cond,
+  permutations = 9999,
+  p.adjust.m = "BH"  # optional, if supported in your version
+)
+pairwise_results_gow
+```
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
