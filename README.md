@@ -1,5 +1,5 @@
-# Classifying-Biophysical-Subpopulations-of-ISGS
-Code used to perform ISG Subpopulation Analysis
+# Classifying Biophysical Subpopulations of ISGs
+A computational workflow for analyzing vesicle (granule) spatial organization from soft X-ray tomography datasets. This repository provides tools for feature extraction, spatial distance calculations, and condition-based clustering.
 
 Pancreatic β-cells regulate blood glucose homeostasis by secreting insulin, which is processed and stored within secretory organelles called insulin secretory granules (ISGs). As insulin matures from proinsulin, ISGs undergo extensive biochemical and structural remodeling, leading to a heterogenous mixture of subpopulations that vary in protein and lipid content, maturity, and release competence. Defects in ISG maturation and alterations in subpopulation composition are implicated in both type 1 and type 2 diabetes, yet systematic methods for defining ISG subpopulations remain limited. To provide a new perspective on ISG heterogeneity, we employ soft x-ray tomography (SXT), which can quantitatively measure the biochemical density of ISGs within whole β-cells. Within these tomograms, we apply unsupervised clustering to classify subpopulations based on biophysical features of ISGs such as molecular density, size, and spatial positioning. 
 
@@ -11,14 +11,12 @@ Below, a cell imaged using SXT is shown on the left, with the nucleus (teal), mi
 </p>
 Contact email: kchang42@usc.edu
 
+Currently part of published work in an article published by *Structure*. Title: Classifying biophysical subpopulations of insulin secretory granules using quantitative whole-cell structure analysis. DOI: 10.1016/j.str.2026.03.005 
+
 # Code Breakdown
 Python functions used to perform data parameterization of ISGs from SXT tomograms.
 
 R functions used to perform clustering analysis, primarily using the R package flexclust (https://cran.r-project.org/web/packages/flexclust/index.html)
-
-# Vesicle & Granule Analysis Pipeline
-
-A computational workflow for analyzing vesicle (granule) spatial organization from cryo-electron tomography datasets. This repository provides tools for feature extraction, spatial distance calculations, and condition-based aggregation.
 
 ---
 
