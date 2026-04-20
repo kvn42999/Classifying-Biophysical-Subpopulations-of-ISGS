@@ -35,7 +35,7 @@ R functions used to perform clustering analysis, primarily using the R package f
 
 ---
 
-# Vesicle Analysis Pipeline
+# Vesicle Analysis Pipeline Functions 
 
 **File:** `Vesicle_Analysis_Pipeline_Function_Github.ipynb`
 
