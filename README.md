@@ -86,7 +86,7 @@ Includes datasets across multiple treatments:
 - GLM + Glucose
 - Additional extended conditions
 
-## Supporting Structures
+### Supporting Structures
 
 - `LACfactordict`  
   Lookup table used for vesicle quantification.
