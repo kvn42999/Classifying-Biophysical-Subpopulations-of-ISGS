@@ -11,7 +11,9 @@ Below, a cell imaged using SXT is shown on the left, with the nucleus (teal), mi
 </p>
 Contact email: kchang42@usc.edu
 
-Currently part of published work in an article published by *Structure*. Title: Classifying biophysical subpopulations of insulin secretory granules using quantitative whole-cell structure analysis. DOI: 10.1016/j.str.2026.03.005 
+Currently part of published work in an article published by *Structure*. 
+Title: Classifying biophysical subpopulations of insulin secretory granules using quantitative whole-cell structure analysis. 
+DOI: 10.1016/j.str.2026.03.005 
 
 # Code Breakdown
 Python functions used to perform data parameterization of ISGs from SXT tomograms.
