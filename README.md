@@ -23,10 +23,6 @@ Python functions used to perform data parameterization of ISGs from SXT tomogram
 
 R functions used to perform clustering analysis, primarily using the R package flexclust (https://cran.r-project.org/web/packages/flexclust/index.html)
 
----
-
-## 📂 Repository Contents
-
 | File | Description |
 |------|------------|
 | `Vesicle_Analysis_Pipeline_Function_Github.ipynb` | Core pipeline for vesicle detection, feature extraction, and distance computation |
@@ -34,7 +30,7 @@ R functions used to perform clustering analysis, primarily using the R package f
 
 ---
 
-## 🧪 Vesicle Analysis Pipeline
+# Vesicle Analysis Pipeline
 
 **File:** `Vesicle_Analysis_Pipeline_Function_Github.ipynb`
 
