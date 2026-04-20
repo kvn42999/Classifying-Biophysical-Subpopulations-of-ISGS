@@ -38,7 +38,7 @@ R functions used to perform clustering analysis, primarily using the R package f
 This notebook implements the **core vesicle analysis pipeline**, including image loading, feature extraction, and spatial distance calculations.
 
 
-_Key Functions_ 
+## Key Functions  
 
 - `openmrc`  
   Loads `.mrc` and `.tiff` microscopy files.
