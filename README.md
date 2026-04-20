@@ -9,9 +9,10 @@ Below, a cell imaged using SXT is shown on the left, with the nucleus (teal), mi
   <img src="BlenderRenderings/9917_2_Whole_TAK.png" alt="ISG" width="400">
   <img src="BlenderRenderings/9917_2_Clusters_TAK.png" alt="ISG" width="400">
 </p>
+
 Contact email: kchang42@usc.edu
 
-Currently part of published work in an article published by *Structure*. 
+Currently part of published work in an article published by [*Structure*](https://www.cell.com/structure/fulltext/S0969-2126(26)00085-7). 
 
 Title: Classifying biophysical subpopulations of insulin secretory granules using quantitative whole-cell structure analysis. 
 
