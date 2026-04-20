@@ -27,6 +27,9 @@ R functions used to perform clustering analysis, primarily using the R package f
 |------|------------|
 | `Vesicle_Analysis_Pipeline_Function_Github.ipynb` | Core pipeline for vesicle detection, feature extraction, and distance computation |
 | `Granule_Analysis_Github.ipynb` | Downstream analysis, aggregation, filtering, and condition comparisons |
+| `Revised_Analysis_Github_Standard.Rmd` | Clustering and statistical analysis of vesicle features using normalized distance metrics |
+| `Revised_Analysis_Gowers_Github.Rmd` | Clustering analysis using Gower distance to incorporate mixed feature types |
+
 
 ---
 
