@@ -37,9 +37,8 @@ R functions used to perform clustering analysis, primarily using the R package f
 ### Overview
 This notebook implements the **core vesicle analysis pipeline**, including image loading, feature extraction, and spatial distance calculations.
 
----
 
-### 🔧 Key Functions
+## Key Functions
 
 - `openmrc`  
   Loads `.mrc` and `.tiff` microscopy files.
@@ -53,9 +52,8 @@ This notebook implements the **core vesicle analysis pipeline**, including image
 - `df_forCluster`  
   Formats processed data for clustering and downstream analysis.
 
----
 
-### 📏 Distance Metrics
+## Distance Metrics
 
 Two types of spatial measurements are computed:
 
@@ -67,9 +65,8 @@ Two types of spatial measurements are computed:
   - Direct Euclidean measurements
   - Preserves absolute spatial relationships
 
----
 
-### 🧱 Data Organization
+## Data Organization
 
 - **`Condition` class**
   - Encapsulates experimental conditions
@@ -77,9 +74,8 @@ Two types of spatial measurements are computed:
 
 - Each cell is processed independently and stored as a structured object.
 
----
 
-### 📊 Experimental Conditions
+## Experimental Conditions
 
 Includes datasets across multiple treatments:
 
@@ -90,9 +86,7 @@ Includes datasets across multiple treatments:
 - GLM + Glucose
 - Additional extended conditions
 
----
-
-### 🧬 Supporting Structures
+## Supporting Structures
 
 - `LACfactordict`  
   Lookup table used for vesicle quantification.
@@ -101,9 +95,7 @@ Includes datasets across multiple treatments:
   - Primary β-cells
   - Non-stimulated (NS) conditions
 
----
-
-### 📤 Output
+## Output
 
 - DataFrames containing:
   - Vesicle coordinates
@@ -112,7 +104,7 @@ Includes datasets across multiple treatments:
 
 ---
 
-## 🔬 Granule Analysis
+# Granule Analysis
 
 **File:** `Granule_Analysis_Github.ipynb`
 
