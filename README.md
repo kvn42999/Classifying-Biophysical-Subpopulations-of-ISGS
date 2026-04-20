@@ -18,6 +18,8 @@ Title: Classifying biophysical subpopulations of insulin secretory granules usin
 
 DOI: 10.1016/j.str.2026.03.005 
 
+Additionally, the raw data can be found at [Zenodo](https://zenodo.org/records/18176996). Additional code and blender add-on can be found [here](https://github.com/aviriva/voxel-gen-tools-for-blender-imaging).
+
 # Code Breakdown
 Python functions used to perform data parameterization of ISGs from SXT tomograms.
 
