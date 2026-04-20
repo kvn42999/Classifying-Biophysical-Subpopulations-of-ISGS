@@ -159,3 +159,95 @@ Each condition:
   - Normalized data directories
   - Raw distance directories
 
+
+---
+
+# Clustering Analysis (Euclidean / Standard Distance)
+
+**File:** `Revised_Analysis_Github_Standard.Rmd`
+
+### Overview
+This script performs **unsupervised clustering of vesicle features** using standard distance metrics. It builds on the processed datasets generated from the Python pipeline and identifies subpopulations of vesicles based on shared biophysical properties.
+
+
+### Analytical Workflow
+
+1. **Load processed datasets**
+   - Imports aggregated vesicle feature tables generated from the pipeline
+   - Typically uses normalized distance features for cross-cell comparability
+
+2. **Preprocess features**
+   - Scales and standardizes variables
+   - Selects relevant features (e.g., size, density, spatial positioning)
+
+3. **Clustering**
+   - Applies clustering algorithms (via `flexclust`)
+   - Groups vesicles into subpopulations based on feature similarity
+
+4. **Cluster evaluation**
+   - Determines optimal cluster number
+   - Evaluates cluster stability and separation
+
+5. **Visualization**
+   - Projects clusters into lower-dimensional space
+   - Visualizes subpopulation structure across conditions
+
+6. **Output**
+   - Cluster assignments appended to vesicle datasets
+   - Summary statistics for each cluster
+
+---
+
+# Clustering Analysis (Gower Distance)
+
+**File:** `Revised_Analysis_Gowers_Github.Rmd`
+
+### Overview
+This script performs clustering using **Gower distance**, allowing integration of **mixed data types** (continuous + categorical features). This is particularly useful when vesicle features include both numeric and discrete variables.
+
+
+### Analytical Workflow
+
+1. **Load processed datasets**
+   - Uses vesicle feature tables from the pipeline output
+   - Can include both normalized and raw-derived features
+
+2. **Feature preparation**
+   - Combines continuous and categorical variables
+   - Ensures compatibility with Gower distance computation
+
+3. **Distance matrix computation**
+   - Computes pairwise distances using Gower metric
+   - Captures similarity across mixed feature types
+
+4. **Clustering**
+   - Applies clustering methods to the Gower distance matrix
+   - Identifies vesicle subpopulations without requiring strict numeric assumptions
+
+5. **Cluster evaluation**
+   - Assesses clustering structure and robustness
+   - Compares with standard-distance clustering results
+
+6. **Visualization and comparison**
+   - Visualizes cluster assignments
+   - Highlights differences between Gower-based and standard clustering
+
+7. **Output**
+   - Cluster-labeled datasets
+   - Comparative insights into vesicle subpopulation structure
+
+---
+
+## Integration with Pipeline
+
+These R-based analyses are designed to be run **after**:
+
+1. `Vesicle_Analysis_Pipeline_Function_Github.ipynb`
+2. `Granule_Analysis_Github.ipynb`
+
+They take the exported CSV files as input and produce:
+
+- Cluster assignments
+- Subpopulation-level summaries
+- Visualizations for downstream interpretation
+
